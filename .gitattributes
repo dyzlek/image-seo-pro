@@ -1,0 +1,13 @@
+* text=auto eol=lf
+*.png binary
+*.mo binary
+
+# Exclus du zip publié (git archive)
+/.github            export-ignore
+/docs               export-ignore
+/tests              export-ignore
+/docker-compose.yml export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
+/CHANGELOG.md       export-ignore
+/README.md          export-ignore

@@ -1,0 +1,63 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    name: Syntaxe PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - run: find . -name '*.php' -print0 | xargs -0 -n1 php -l
+      - run: node --check assets/admin.js
+
+  integration:
+    name: WordPress + ${{ matrix.engine }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [gd, imagick]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress
+        ports: ['3306:3306']
+        options: --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=5s --health-retries=10
+    env:
+      WP: /tmp/wordpress
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: gd, imagick, mysqli
+          tools: wp-cli
+          coverage: none
+
+      - name: Installe WordPress
+        run: |
+          wp core download --path=$WP
+          wp config create --path=$WP --dbname=wordpress --dbuser=root --dbpass=root --dbhost=127.0.0.1 --skip-check
+          wp core install --path=$WP --url=http://localhost --title=CI --admin_user=admin --admin_password=admin --admin_email=ci@example.com --skip-email
+          ln -s "$GITHUB_WORKSPACE" $WP/wp-content/plugins/image-seo-pro
+          wp plugin activate image-seo-pro --path=$WP
+
+      - name: Tests d'intégration
+        env:
+          ISP_ENGINE: ${{ matrix.engine }}
+          ISP_TEST_UNINSTALL: 1
+        run: wp eval-file "$GITHUB_WORKSPACE/tests/integration/run.php" --path=$WP

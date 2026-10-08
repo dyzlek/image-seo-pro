@@ -1,0 +1,12 @@
+# Identifiants du compte de test local
+tests/.test-credentials
+
+# Builds
+/dist/
+*.zip
+
+# Système / éditeurs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

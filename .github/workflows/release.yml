@@ -1,0 +1,46 @@
+# À chaque tag vX.Y.Z : vérifie les versions puis publie une Release GitHub
+# avec le zip installable depuis WordPress (Extensions → Ajouter → Téléverser).
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Syntaxe
+        run: |
+          find . -name '*.php' -print0 | xargs -0 -n1 php -l
+          node --check assets/admin.js
+
+      - name: Vérifie que les numéros de version correspondent au tag
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          grep -q "^ \* Version: *$V$" image-seo-pro.php
+          grep -q "define( 'ISP_VERSION', '$V' );" image-seo-pro.php
+          grep -q "^Stable tag: $V$" readme.txt
+          grep -q "^## \[$V\]" CHANGELOG.md
+
+      - name: Archive installable
+        run: |
+          mkdir dist
+          git archive --format=zip --prefix=image-seo-pro/ -o dist/image-seo-pro-${GITHUB_REF_NAME}.zip HEAD
+
+      - name: Release GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          awk -v h="## [${GITHUB_REF_NAME#v}]" 'index($0, h) == 1 {p=1; next} /^## \[/ {p=0} p' CHANGELOG.md > notes.md
+          gh release create "$GITHUB_REF_NAME" dist/*.zip --title "$GITHUB_REF_NAME" --notes-file notes.md
